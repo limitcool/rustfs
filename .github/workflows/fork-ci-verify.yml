@@ -1,0 +1,53 @@
+# Fork-side verification probe.
+#
+# Upstream CI (ci.yml) targets self-hosted `sm-standard-*` runners that this
+# fork does not have, so a fork push produces no usable run. This throwaway
+# workflow runs the SAME failing lane plus the compile+tests the 3 GiB local
+# box could not, on GitHub-hosted runners. It is not the upstream pipeline and
+# is deleted once it has served its purpose.
+name: fork-ci-verify
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ ci-verify ]
+
+jobs:
+  quick-checks:
+    name: Quick Checks (real composite action)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/quick-checks
+
+  compile-and-test:
+    name: Compile + unit-test affected crates
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          df -h /
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: fork-ci-verify
+
+      - name: cargo check (config + iam)
+        run: cargo check -p rustfs-config -p rustfs-iam
+
+      - name: cargo test rustfs-iam lib
+        run: cargo test -p rustfs-iam --lib
+
+      - name: cargo test rustfs bin (oidc handlers)
+        run: cargo test -p rustfs --bins -- admin::handlers::oidc
