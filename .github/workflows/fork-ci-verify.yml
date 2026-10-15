@@ -39,6 +39,12 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
 
+      - name: Install protoc (pulsar build script)
+        uses: rustfs/setup-protoc@a3705324d8f9bf5b6c3573fb6cf8ae421db55dd6 # v3.0.1
+        with:
+          version: "35.1"
+          repo-token: ${{ github.token }}
+
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: fork-ci-verify
